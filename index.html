@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Task Management</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+      }
+      form {
+        margin-bottom: 20px;
+      }
+      input,
+      button {
+        margin: 5px 0;
+        padding: 10px;
+        font-size: 16px;
+      }
+      .task-group {
+        margin-top: 20px;
+      }
+      .task {
+        padding: 10px;
+        border: 1px solid #ccc;
+        margin-bottom: 10px;
+        border-radius: 5px;
+      }
+      .task select {
+        margin-top: 10px;
+        padding: 5px;
+        font-size: 14px;
+      }
+      .group-title {
+        font-size: 18px;
+        font-weight: bold;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Task Management</h1>
+    <form id="task-form">
+      <input type="text" id="task-title" placeholder="Task Title" required />
+      <input
+        type="text"
+        id="task-desc"
+        placeholder="Task Description"
+        required
+      />
+      <button type="submit">Add Task</button>
+    </form>
+    <div class="task-list">
+      <div class="task-group" id="to-do-group">
+        <h2 class="group-title">To Do</h2>
+        <!-- "To Do" tasks will be inserted here -->
+      </div>
+      <div class="task-group" id="in-progress-group">
+        <h2 class="group-title">In Progress</h2>
+        <!-- "In Progress" tasks will be inserted here -->
+      </div>
+      <div class="task-group" id="done-group">
+        <h2 class="group-title">Done</h2>
+        <!-- "Done" tasks will be inserted here -->
+      </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+      // Initialize WebSocket connection to the backend
+      const socket = io("http://127.0.0.1:5000");
+
+      const taskForm = document.getElementById("task-form");
+      const toDoGroup = document.getElementById("to-do-group");
+      const inProgressGroup = document.getElementById("in-progress-group");
+      const doneGroup = document.getElementById("done-group");
+
+      // Fetch all tasks when the page loads
+      async function fetchInitialTasks() {
+        try {
+          const response = await fetch("http://127.0.0.1:5000/get_tasks");
+          if (!response.ok) {
+            throw new Error("Failed to fetch tasks");
+          }
+          const data = await response.json();
+          if (data.success) {
+            // Populate the task list with initial tasks
+            displayGroupedTasks(data.tasks);
+          }
+        } catch (error) {
+          console.error("Error fetching tasks:", error);
+        }
+      }
+
+      // Handle form submission
+      taskForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const title = document.getElementById("task-title").value;
+        const desc = document.getElementById("task-desc").value;
+
+        // Send new task to server via HTTP POST
+        const response = await fetch("http://127.0.0.1:5000/add_task", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, description: desc }),
+        });
+
+        if (response.ok) {
+          // Clear the form fields after successful submission
+          document.getElementById("task-title").value = "";
+          document.getElementById("task-desc").value = "";
+        } else {
+          alert("Failed to add task. Please try again.");
+        }
+      });
+
+      // Listen for 'tasks_updated' event via WebSocket
+      socket.on("tasks_updated", (tasks) => {
+        displayGroupedTasks(tasks);
+      });
+
+      // Function to display tasks grouped by status
+      function displayGroupedTasks(tasks) {
+        // Clear all groups
+        toDoGroup.innerHTML = '<h2 class="group-title">To Do</h2>';
+        inProgressGroup.innerHTML = '<h2 class="group-title">In Progress</h2>';
+        doneGroup.innerHTML = '<h2 class="group-title">Done</h2>';
+
+        // Add tasks to their respective groups
+        tasks["To Do"].forEach((task) => addTaskToGroup(task, toDoGroup));
+        tasks["In Progress"].forEach((task) =>
+          addTaskToGroup(task, inProgressGroup)
+        );
+        tasks["Done"].forEach((task) => addTaskToGroup(task, doneGroup));
+      }
+
+      // Function to add a task to a specific group
+      function addTaskToGroup(task, group) {
+        const taskElement = document.createElement("div");
+        taskElement.className = "task";
+        taskElement.innerHTML = `
+          <strong>${task.title}</strong><br>${task.description}<br>
+          <select onchange="updateTaskStatus(${task.id}, this.value)">
+            <option value="To Do" ${
+              task.status.find((s) => s.name === "To Do" && s.selected)
+                ? "selected"
+                : ""
+            }>To Do</option>
+            <option value="In Progress" ${
+              task.status.find((s) => s.name === "In Progress" && s.selected)
+                ? "selected"
+                : ""
+            }>In Progress</option>
+            <option value="Done" ${
+              task.status.find((s) => s.name === "Done" && s.selected)
+                ? "selected"
+                : ""
+            }>Done</option>
+          </select>
+        `;
+        group.appendChild(taskElement);
+      }
+
+      // Function to update task status
+      async function updateTaskStatus(taskId, newStatus) {
+        try {
+          const response = await fetch(
+            `http://127.0.0.1:5000/update_task_status/${taskId}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: newStatus }),
+            }
+          );
+          if (!response.ok) {
+            throw new Error("Failed to update task status");
+          }
+        } catch (error) {
+          console.error("Error updating task status:", error);
+        }
+      }
+
+      // Fetch initial tasks on page load
+      fetchInitialTasks();
+    </script>
+  </body>
+</html>
