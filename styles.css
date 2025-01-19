@@ -147,3 +147,25 @@ button:hover {
     flex-direction: column;
   }
 }
+
+.blurred {
+  filter: blur(2px);
+  pointer-events: none; /* onemogućava klikanje po zamagljenoj pozadini */
+}
+
+/* Loader iznad svega */
+#loader {
+  position: fixed; /* fiksno pozicioniran */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9999; /* iznad svih ostalih elemenata */
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #3498db;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  display: none; /* i dalje skriven po defaultu */
+  background: transparent; /* po želji */
+}
